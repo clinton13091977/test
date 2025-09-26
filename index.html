@@ -47,7 +47,6 @@ th { background:#eef6ff;}
 <div id="authContainer" class="container">
   <img src="logo.jpg" alt="Company Logo" style="max-width:100px;margin-bottom:10px;">
   <h2>Smart Bio</h2>
-
   <input type="email" id="email" placeholder="Email">
   <input type="password" id="password" placeholder="Password">
   <select id="role">
@@ -60,7 +59,7 @@ th { background:#eef6ff;}
 </div>
 
 <!-- USER FORM -->
-<div id="userForm" class="container">
+<div id="userForm" class="container" style="display:none;">
   <header>
     <img src="logo.jpg" alt="Company Logo">
     <h1>Digital Service Report - Complaint</h1>
@@ -81,7 +80,7 @@ th { background:#eef6ff;}
 </div>
 
 <!-- ENGINEER DASHBOARD -->
-<div id="engineerDashboard" class="container">
+<div id="engineerDashboard" class="container" style="display:none;">
   <header>
     <img src="logo.jpg" alt="Company Logo">
     <h1>Engineer Dashboard</h1>
@@ -105,13 +104,10 @@ th { background:#eef6ff;}
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
 <script>
 // Firebase config
 const firebaseConfig = {
-  apiKey: "AIzaSyAWPlgLt8OQPX6Gq6hzsp46VZxSxXIU5i0",
+  apiKey: "YOUR_API_KEY",
   authDomain: "digital-service-report.firebaseapp.com",
   projectId: "digital-service-report",
   storageBucket: "digital-service-report.appspot.com",
@@ -179,87 +175,88 @@ function loadComplaints(){
     tbody.innerHTML="";
     snap.forEach(doc=>{
       const c=doc.data();
+      let actionButtons = '';
+      if(c.status === "open"){
+          actionButtons = `<button onclick="closeComplaint('${doc.id}')">Close</button>`;
+      } else {
+          actionButtons = `<button onclick="viewPDF('${doc.id}')">View PDF</button>`;
+      }
       const tr=document.createElement("tr");
-      tr.innerHTML=`<td>${doc.id}</td><td>${c.dept}</td><td>${c.equip}</td>
-      <td>${c.problem}</td><td>${c.status}</td>
-      <td>${c.status==="open"?`<button onclick="closeComplaint('${doc.id}')">Close</button>`:"Closed"}</td>`;
+      tr.innerHTML=`<td>${doc.id}</td><td>${c.dept}</td><td>${c.equip}</td><td>${c.problem}</td><td>${c.status}</td><td>${actionButtons}</td>`;
       tbody.appendChild(tr);
     });
   });
 }
 
+// CLOSE COMPLAINT
 function closeComplaint(id){
-  signer=id; openSignature("engineer");
-}
-
-function saveEngineerAction(signature){
-  const action = prompt("Enter Action Taken:");
-  if(!action){ alert("Action required"); return; }
-
-  db.collection("complaints").doc(signer).get().then(doc=>{
-    const data = doc.data();
-    db.collection("complaints").doc(signer).update({
-      actionTaken: action,
-      engineerSign: signature,
-      status:"closed",
-      closed: firebase.firestore.FieldValue.serverTimestamp()
-    }).then(()=>{
-      alert("Complaint Closed!");
-      generatePDF(doc.id, data, action, signature);
-    });
-  });
+  signer="engineer";
+  const action = prompt("Action Taken:");
+  if(!action) return;
+  openSignature("engineer");
+  document.getElementById("sigModal").dataset.complaintId=id;
+  document.getElementById("sigModal").dataset.actionTaken=action;
 }
 
 // SIGNATURE
-function openSignature(who){
-  document.getElementById("sigModal").style.display="flex";
+function openSignature(role){ signer=role; 
+  document.getElementById("sigModal").style.display="flex"; 
   const canvas=document.getElementById("sigCanvas");
-  canvas.width=300; canvas.height=200;
+  canvas.width=canvas.offsetWidth*2;
+  canvas.height=canvas.offsetHeight*2;
+  canvas.getContext("2d").scale(2,2);
   sigPad=new SignaturePad(canvas,{penColor:"black"});
-  signer=who;
 }
+
 function acceptSignature(){
-  if(sigPad.isEmpty()){ alert("Please sign first"); return; }
-  const data=sigPad.toDataURL();
-  if(currentRole==="user" && signer==="user"){ document.getElementById("userSignImg").src=data; }
-  else if(currentRole==="engineer"){ saveEngineerAction(data); }
+  if(sigPad.isEmpty()){ alert("Please sign first!"); return; }
+  const dataUrl = sigPad.toDataURL();
+  if(signer==="user") document.getElementById("userSignImg").src=dataUrl;
+  else if(signer==="engineer"){
+    const id = document.getElementById("sigModal").dataset.complaintId;
+    const actionTaken = document.getElementById("sigModal").dataset.actionTaken;
+    // Update complaint
+    db.collection("complaints").doc(id).get().then(doc=>{
+      const c = doc.data();
+      db.collection("complaints").doc(id).update({status:"closed", actionTaken:actionTaken, engineerSign:dataUrl}).then(async()=>{
+        // Generate PDF
+        const pdfContent = `
+          <h3>Complaint ID: ${id}</h3>
+          <p><b>Department:</b> ${c.dept}</p>
+          <p><b>Equipment:</b> ${c.equip}</p>
+          <p><b>Serial No:</b> ${c.serial}</p>
+          <p><b>Problem:</b> ${c.problem}</p>
+          <p><b>Action Taken:</b> ${actionTaken}</p>
+          <p><b>User Signature:</b><br><img src="${c.userSign}" width="180"></p>
+          <p><b>Engineer Signature:</b><br><img src="${dataUrl}" width="180"></p>`;
+        const div = document.createElement("div"); div.innerHTML=pdfContent;
+        const canvas = await html2canvas(div,{scale:2});
+        const img = canvas.toDataURL("image/jpeg",0.98);
+        const pdf = new jspdf.jsPDF("p","mm","a4");
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const imgProps = pdf.getImageProperties(img);
+        const pdfHeight = (imgProps.height*pageWidth)/imgProps.width;
+        const scaleFactor = pageHeight / pdfHeight;
+        pdf.addImage(img,"JPEG",0,0,pageWidth,pdfHeight*scaleFactor);
+        const pdfBlob = pdf.output("blob");
+        const storageRef = storage.ref().child("complaints/Complaint_" + id + ".pdf");
+        storageRef.put(pdfBlob).then(()=>alert("Complaint closed and PDF uploaded!"));
+      });
+    });
+  }
   closeSignature();
 }
+
 function clearSignature(){ sigPad.clear(); }
 function closeSignature(){ document.getElementById("sigModal").style.display="none"; }
 
-// PDF generation & Cloud storage
-async function generatePDF(id, complaintData, action, engineerSign){
-  const content=`<div>
-    <h3>Complaint ID: ${id}</h3>
-    <p><b>Dept:</b> ${complaintData.dept}</p>
-    <p><b>Equipment:</b> ${complaintData.equip}</p>
-    <p><b>Serial:</b> ${complaintData.serial}</p>
-    <p><b>Problem:</b> ${complaintData.problem}</p>
-    <p><b>User Signature:</b><br><img src="${complaintData.userSign}" width="180"></p>
-    <p><b>Action Taken:</b> ${action}</p>
-    <p><b>Engineer Signature:</b><br><img src="${engineerSign}" width="180"></p>
-  </div>`;
-
-  const div=document.createElement("div");
-  div.innerHTML=content; document.body.appendChild(div);
-  const canvas=await html2canvas(div,{scale:2});
-  const img=canvas.toDataURL("image/jpeg",0.98);
-  const pdf=new jspdf.jsPDF("p","mm","a4");
-  const pageWidth=pdf.internal.pageSize.getWidth();
-  const pageHeight=pdf.internal.pageSize.getHeight();
-  const imgProps=pdf.getImageProperties(img);
-  const pdfHeight=(imgProps.height*pageWidth)/imgProps.width;
-  const scaleFactor=pageHeight/pdfHeight;
-  pdf.addImage(img,"JPEG",0,0,pageWidth,pdfHeight*scaleFactor);
-  const fileName = `Complaint_${id}.pdf`;
-  pdf.save(fileName);
-
-  // Upload to Firebase Storage
-  const storageRef = storage.ref().child("complaints/"+fileName);
-  const blob = await (await fetch(img)).blob();
-  storageRef.put(blob).then(()=>console.log("Uploaded PDF to Cloud"));
-  document.body.removeChild(div);
+// VIEW PDF
+function viewPDF(id){
+  const storageRef = storage.ref().child("complaints/Complaint_" + id + ".pdf");
+  storageRef.getDownloadURL().then(url=>{
+    window.open(url,"_blank");
+  }).catch(()=>alert("PDF not found."));
 }
 </script>
 </body>
