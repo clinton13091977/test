@@ -43,6 +43,7 @@ th { background:#eef6ff;}
 #signupFields { display:none; }
 #userForm, #engineerDashboard { display:none; }
 
+.logout-btn { margin-top:8px; background:#d62828; color:#fff; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:11px; }
 </style>
 </head>
 <body>
@@ -77,13 +78,17 @@ th { background:#eef6ff;}
     <img src="logo.jpg" alt="Company Logo">
     <h1>Digital Service Report - Complaint</h1>
   </header>
+  <button class="logout-btn" onclick="logout()">Logout</button>
   <div class="section">
     <h3>Register Complaint</h3>
     <div class="form-row"><label>Department</label><input id="deptUser" type="text"></div>
     <div class="form-row"><label>Equipment</label><input id="equipUser" type="text"></div>
     <div class="form-row"><label>Serial No.</label><input id="serialUser" type="text"></div>
     <div class="form-row"><label>Problem</label><input id="problemUser" type="text"></div>
-    <div class="controls"><button class="btn-primary" onclick="openSignature('user')">Sign & Submit</button></div>
+    <div class="controls">
+      <button class="btn-primary" onclick="openSignature('user')">Sign</button>
+      <button class="btn-primary" onclick="submitComplaint()">Submit</button>
+    </div>
     <img id="userSignImg" class="sig-preview">
   </div>
 </div>
@@ -94,6 +99,7 @@ th { background:#eef6ff;}
     <img src="logo.jpg" alt="Company Logo">
     <h1>Engineer Dashboard</h1>
   </header>
+  <button class="logout-btn" onclick="logout()">Logout</button>
   <table id="complaintTable">
     <thead><tr><th>ID</th><th>Dept</th><th>Equip</th><th>Problem</th><th>Status</th><th>Action</th></tr></thead>
     <tbody></tbody>
@@ -161,8 +167,17 @@ function authAction(){
   }
 }
 
+// LOGOUT
+function logout(){
+  auth.signOut().then(()=>{
+    location.reload();
+  });
+}
+
 // USER COMPLAINT
-function saveComplaint(signature){
+function submitComplaint(){
+  const signature = document.getElementById("userSignImg").src;
+  if(!signature){ alert("Please sign first!"); return; }
   const data = {
     dept: document.getElementById("deptUser").value,
     equip: document.getElementById("equipUser").value,
@@ -221,7 +236,7 @@ function openSignature(who){
 function acceptSignature(){
   if(sigPad.isEmpty()){ alert("Please sign first"); return; }
   const data=sigPad.toDataURL();
-  if(currentRole==="user" && signer==="user"){ document.getElementById("userSignImg").src=data; saveComplaint(data); }
+  if(currentRole==="user" && signer==="user"){ document.getElementById("userSignImg").src=data; }
   else if(currentRole==="engineer"){ saveEngineerAction(data); }
   closeSignature();
 }
