@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Smart Bio - Digital Service Report</title>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<!-- Signature -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/signature_pad/4.1.7/signature_pad.umd.min.js"></script>
+
+<style>
+body { font-family: Arial, sans-serif; background:#f4f6fa; margin:0; padding:0;}
+.container { max-width:750px; margin:20px auto; background:#fff; padding:12px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+header { text-align:center; margin-bottom:10px; background:#0d4f8b; color:#fff; padding:8px; border-radius:6px;}
+header img { max-width:70px; display:block; margin:0 auto 4px;}
+header h1, header h2 { font-size:14px; margin:0; font-weight:bold;}
+.section { margin-top:10px; padding:8px; border:1px solid #dce3ef; border-radius:6px;}
+.section h3 { margin:0 0 6px 0; font-size:12px; color:#0d4f8b; border-bottom:1px solid #ddd; padding-bottom:3px;}
+.form-row { display:flex; align-items:center; margin-bottom:6px;}
+label { font-weight:bold; font-size:11px; display:inline-block; width:120px;}
+input, select { flex:1; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:11px;}
+button { padding:6px 10px; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px; }
+.btn-primary { background:#0d4f8b; color:#fff; }
+.btn-danger { background:#d62828; color:#fff; }
+.controls { margin-top:6px; display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+.sig-preview { margin-top:4px; max-width:180px; border:1px solid #ccc; display:block; margin-left:auto; margin-right:auto;}
+.modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); justify-content:center; align-items:center; z-index:1000;}
+.modal-inner { background:#fff; width:320px; border-radius:6px; display:flex; flex-direction:column; padding:10px; }
+.modal-inner input { margin-bottom:8px; padding:4px; border:1px solid #ccc; border-radius:4px;}
+.modal-inner button { margin-top:4px; }
+table { width:100%; border-collapse:collapse; margin-top:8px; font-size:10px;}
+th,td { border:1px solid #ccc; padding:3px; text-align:center;}
+th { background:#eef6ff;}
+.note { font-size:9px; font-style:italic; margin-top:4px; }
+
+#authContainer { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; }
+#authContainer input, #authContainer select { margin-bottom:8px; width:80%; padding:6px; }
+#signupFields { display:none; }
+#userForm, #engineerDashboard { display:none; }
+
+</style>
+</head>
+<body>
+
+<!-- LOGIN & SIGNUP -->
+<div id="authContainer" class="container">
+  <img src="logo.jpg" alt="Company Logo" style="max-width:100px;margin-bottom:10px;">
+  <h2>Smart Bio</h2>
+
+  <input type="email" id="email" placeholder="Email">
+  <input type="password" id="password" placeholder="Password">
+  <select id="role">
+    <option value="user">User</option>
+    <option value="engineer">Biomedical Engineer</option>
+  </select>
+
+  <!-- Additional Signup Fields -->
+  <div id="signupFields">
+    <input type="password" id="signupPasswordConfirm" placeholder="Confirm Password">
+  </div>
+
+  <div class="controls">
+    <button class="btn-primary" id="authButton" onclick="authAction()">Login</button>
+    <button class="btn-primary" style="background:#0d4f8b;" onclick="toggleSignup()">Sign Up</button>
+  </div>
+  <div id="toggleText" style="margin-top:6px; font-size:11px; color:#0d4f8b;"></div>
+</div>
+
+<!-- USER COMPLAINT FORM -->
+<div id="userForm" class="container">
+  <header>
+    <img src="logo.jpg" alt="Company Logo">
+    <h1>Digital Service Report - Complaint</h1>
+  </header>
+  <div class="section">
+    <h3>Register Complaint</h3>
+    <div class="form-row"><label>Department</label><input id="deptUser" type="text"></div>
+    <div class="form-row"><label>Equipment</label><input id="equipUser" type="text"></div>
+    <div class="form-row"><label>Serial No.</label><input id="serialUser" type="text"></div>
+    <div class="form-row"><label>Problem</label><input id="problemUser" type="text"></div>
+    <div class="controls"><button class="btn-primary" onclick="openSignature('user')">Sign & Submit</button></div>
+    <img id="userSignImg" class="sig-preview">
+  </div>
+</div>
+
+<!-- ENGINEER DASHBOARD -->
+<div id="engineerDashboard" class="container">
+  <header>
+    <img src="logo.jpg" alt="Company Logo">
+    <h1>Engineer Dashboard</h1>
+  </header>
+  <table id="complaintTable">
+    <thead><tr><th>ID</th><th>Dept</th><th>Equip</th><th>Problem</th><th>Status</th><th>Action</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<!-- Signature Modal -->
+<div id="sigModal" class="modal">
+  <div class="modal-inner">
+    <canvas id="sigCanvas" style="border:1px solid #000; height:200px;"></canvas>
+    <div class="controls">
+      <button class="btn-primary" onclick="acceptSignature()">Accept</button>
+      <button class="btn-danger" onclick="clearSignature()">Clear</button>
+      <button onclick="closeSignature()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyAWPlgLt8OQPX6Gq6hzsp46VZxSxXIU5i0",
+  authDomain: "digital-service-report.firebaseapp.com",
+  projectId: "digital-service-report",
+  storageBucket: "digital-service-report.appspot.com",
+  messagingSenderId: "783895149200",
+  appId: "1:783895149200:web:01c08a62d429bf1bf8f615"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+let isSignup=false, currentRole="", currentUser="", signer="", sigPad;
+
+// Toggle login/signup
+function toggleSignup(){
+  isSignup = !isSignup;
+  document.getElementById("signupFields").style.display = isSignup?"block":"none";
+  document.getElementById("authButton").textContent = isSignup?"Sign Up":"Login";
+}
+
+// Auth action
+function authAction(){
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+  const role = document.getElementById("role").value;
+
+  if(isSignup){
+    const passConfirm = document.getElementById("signupPasswordConfirm").value;
+    if(password!==passConfirm){ alert("Passwords do not match!"); return; }
+    auth.createUserWithEmailAndPassword(email,password)
+    .then(cred=>{
+      db.collection("users").doc(cred.user.uid).set({role:role});
+      alert("Sign Up Success! Please login.");
+      toggleSignup();
+    }).catch(err=>alert(err.message));
+  } else {
+    auth.signInWithEmailAndPassword(email,password)
+    .then(cred=>{
+      currentUser=cred.user.uid; currentRole=role;
+      document.getElementById("authContainer").style.display="none";
+      if(role==="user") document.getElementById("userForm").style.display="block";
+      else if(role==="engineer"){ document.getElementById("engineerDashboard").style.display="block"; loadComplaints(); }
+    }).catch(err=>alert(err.message));
+  }
+}
+
+// USER COMPLAINT
+function saveComplaint(signature){
+  const data = {
+    dept: document.getElementById("deptUser").value,
+    equip: document.getElementById("equipUser").value,
+    serial: document.getElementById("serialUser").value,
+    problem: document.getElementById("problemUser").value,
+    userSign: signature,
+    status: "open",
+    created: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  db.collection("complaints").add(data).then(()=>{
+    alert("Complaint Submitted!");
+    document.getElementById("deptUser").value="";
+    document.getElementById("equipUser").value="";
+    document.getElementById("serialUser").value="";
+    document.getElementById("problemUser").value="";
+    document.getElementById("userSignImg").src="";
+  });
+}
+
+// ENGINEER DASHBOARD
+function loadComplaints(){
+  db.collection("complaints").orderBy("created","desc").onSnapshot(snapshot=>{
+    const tbody=document.querySelector("#complaintTable tbody");
+    tbody.innerHTML="";
+    snapshot.forEach(doc=>{
+      const c=doc.data();
+      const tr=document.createElement("tr");
+      tr.innerHTML = `
+        <td>${doc.id}</td><td>${c.dept}</td><td>${c.equip}</td>
+        <td>${c.problem}</td><td>${c.status}</td>
+        <td>${c.status==="open"?`<button onclick="closeComplaint('${doc.id}')">Close</button>`:"Closed"}</td>`;
+      tbody.appendChild(tr);
+    });
+  });
+}
+
+function closeComplaint(id){ signer=id; openSignature("engineer"); }
+function saveEngineerAction(signature){
+  const action = prompt("Enter Action Taken:");
+  db.collection("complaints").doc(signer).update({
+    actionTaken: action,
+    engineerSign: signature,
+    status: "closed",
+    closed: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(()=>alert("Complaint Closed!"));
+}
+
+// SIGNATURE
+function openSignature(who){
+  document.getElementById("sigModal").style.display="flex";
+  const canvas=document.getElementById("sigCanvas");
+  canvas.width=300; canvas.height=200;
+  sigPad=new SignaturePad(canvas,{penColor:"black"});
+  signer=who;
+}
+function acceptSignature(){
+  if(sigPad.isEmpty()){ alert("Please sign first"); return; }
+  const data=sigPad.toDataURL();
+  if(currentRole==="user" && signer==="user"){ document.getElementById("userSignImg").src=data; saveComplaint(data); }
+  else if(currentRole==="engineer"){ saveEngineerAction(data); }
+  closeSignature();
+}
+function clearSignature(){ sigPad.clear(); }
+function closeSignature(){ document.getElementById("sigModal").style.display="none"; }
+</script>
+</body>
+</html>
