@@ -9,21 +9,24 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
-<!-- Signature -->
+<!-- Signature & PDF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/signature_pad/4.1.7/signature_pad.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
 body { font-family: Arial, sans-serif; background:#f4f6fa; margin:0; padding:0;}
-.container { max-width:750px; margin:20px auto; background:#fff; padding:12px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+.container { max-width:800px; margin:20px auto; background:#fff; padding:12px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.1);}
 header { text-align:center; margin-bottom:10px; background:#0d4f8b; color:#fff; padding:8px; border-radius:6px;}
 header img { max-width:70px; display:block; margin:0 auto 4px;}
-header h1, header h2 { font-size:14px; margin:0; font-weight:bold;}
+header h1 { font-size:14px; margin:0; font-weight:bold;}
 .section { margin-top:10px; padding:8px; border:1px solid #dce3ef; border-radius:6px;}
 .section h3 { margin:0 0 6px 0; font-size:12px; color:#0d4f8b; border-bottom:1px solid #ddd; padding-bottom:3px;}
 .form-row { display:flex; align-items:center; margin-bottom:6px;}
 label { font-weight:bold; font-size:11px; display:inline-block; width:120px;}
-input, select { flex:1; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:11px;}
+input, select, textarea { flex:1; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:11px;}
 button { padding:6px 10px; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:11px; }
 .btn-primary { background:#0d4f8b; color:#fff; }
 .btn-danger { background:#d62828; color:#fff; }
@@ -31,24 +34,16 @@ button { padding:6px 10px; border:none; border-radius:4px; cursor:pointer; font-
 .sig-preview { margin-top:4px; max-width:180px; border:1px solid #ccc; display:block; margin-left:auto; margin-right:auto;}
 .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); justify-content:center; align-items:center; z-index:1000;}
 .modal-inner { background:#fff; width:320px; border-radius:6px; display:flex; flex-direction:column; padding:10px; }
-.modal-inner input { margin-bottom:8px; padding:4px; border:1px solid #ccc; border-radius:4px;}
-.modal-inner button { margin-top:4px; }
+.modal-inner input, .modal-inner textarea { margin-bottom:8px; padding:4px; border:1px solid #ccc; border-radius:4px;}
+.logout-btn { margin-top:8px; background:#d62828; color:#fff; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:11px; }
 table { width:100%; border-collapse:collapse; margin-top:8px; font-size:10px;}
 th,td { border:1px solid #ccc; padding:3px; text-align:center;}
 th { background:#eef6ff;}
 .note { font-size:9px; font-style:italic; margin-top:4px; }
-
-#authContainer { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; }
-#authContainer input, #authContainer select { margin-bottom:8px; width:80%; padding:6px; }
-#signupFields { display:none; }
-#userForm, #engineerDashboard { display:none; }
-
-.logout-btn { margin-top:8px; background:#d62828; color:#fff; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:11px; }
 </style>
 </head>
 <body>
 
-<!-- LOGIN & SIGNUP -->
 <div id="authContainer" class="container">
   <img src="logo.jpg" alt="Company Logo" style="max-width:100px;margin-bottom:10px;">
   <h2>Smart Bio</h2>
@@ -59,20 +54,12 @@ th { background:#eef6ff;}
     <option value="user">User</option>
     <option value="engineer">Biomedical Engineer</option>
   </select>
-
-  <!-- Additional Signup Fields -->
-  <div id="signupFields">
-    <input type="password" id="signupPasswordConfirm" placeholder="Confirm Password">
-  </div>
-
   <div class="controls">
-    <button class="btn-primary" id="authButton" onclick="authAction()">Login</button>
-    <button class="btn-primary" style="background:#0d4f8b;" onclick="toggleSignup()">Sign Up</button>
+    <button class="btn-primary" onclick="authAction()">Login / Sign Up</button>
   </div>
-  <div id="toggleText" style="margin-top:6px; font-size:11px; color:#0d4f8b;"></div>
 </div>
 
-<!-- USER COMPLAINT FORM -->
+<!-- USER FORM -->
 <div id="userForm" class="container">
   <header>
     <img src="logo.jpg" alt="Company Logo">
@@ -84,7 +71,7 @@ th { background:#eef6ff;}
     <div class="form-row"><label>Department</label><input id="deptUser" type="text"></div>
     <div class="form-row"><label>Equipment</label><input id="equipUser" type="text"></div>
     <div class="form-row"><label>Serial No.</label><input id="serialUser" type="text"></div>
-    <div class="form-row"><label>Problem</label><input id="problemUser" type="text"></div>
+    <div class="form-row"><label>Problem</label><textarea id="problemUser"></textarea></div>
     <div class="controls">
       <button class="btn-primary" onclick="openSignature('user')">Sign</button>
       <button class="btn-primary" onclick="submitComplaint()">Submit</button>
@@ -118,6 +105,9 @@ th { background:#eef6ff;}
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
 <script>
 // Firebase config
 const firebaseConfig = {
@@ -131,64 +121,49 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
+const storage = firebase.storage();
 
-let isSignup=false, currentRole="", currentUser="", signer="", sigPad;
+let currentUser="", currentRole="", signer="", sigPad="";
 
-// Toggle login/signup
-function toggleSignup(){
-  isSignup = !isSignup;
-  document.getElementById("signupFields").style.display = isSignup?"block":"none";
-  document.getElementById("authButton").textContent = isSignup?"Sign Up":"Login";
-}
-
-// Auth action
+// AUTH
 function authAction(){
-  const email = document.getElementById("email").value;
-  const password = document.getElementById("password").value;
-  const role = document.getElementById("role").value;
+  const email=document.getElementById("email").value;
+  const password=document.getElementById("password").value;
+  const role=document.getElementById("role").value;
 
-  if(isSignup){
-    const passConfirm = document.getElementById("signupPasswordConfirm").value;
-    if(password!==passConfirm){ alert("Passwords do not match!"); return; }
-    auth.createUserWithEmailAndPassword(email,password)
-    .then(cred=>{
-      db.collection("users").doc(cred.user.uid).set({role:role});
-      alert("Sign Up Success! Please login.");
-      toggleSignup();
-    }).catch(err=>alert(err.message));
-  } else {
-    auth.signInWithEmailAndPassword(email,password)
+  auth.signInWithEmailAndPassword(email,password)
     .then(cred=>{
       currentUser=cred.user.uid; currentRole=role;
       document.getElementById("authContainer").style.display="none";
       if(role==="user") document.getElementById("userForm").style.display="block";
-      else if(role==="engineer"){ document.getElementById("engineerDashboard").style.display="block"; loadComplaints(); }
-    }).catch(err=>alert(err.message));
-  }
+      else if(role==="engineer") { document.getElementById("engineerDashboard").style.display="block"; loadComplaints(); }
+    }).catch(err=>{
+      // Auto sign up if user not exists
+      auth.createUserWithEmailAndPassword(email,password)
+      .then(()=>{ alert("User registered. Please login."); })
+      .catch(e=>alert(e.message));
+    });
 }
 
-// LOGOUT
-function logout(){
-  auth.signOut().then(()=>{
-    location.reload();
-  });
-}
+function logout(){ auth.signOut().then(()=>location.reload()); }
 
 // USER COMPLAINT
 function submitComplaint(){
-  const signature = document.getElementById("userSignImg").src;
-  if(!signature){ alert("Please sign first!"); return; }
-  const data = {
+  if(!document.getElementById("userSignImg").src){
+    alert("Please sign first!"); return;
+  }
+  if(!confirm("Submit complaint?")) return;
+  const data={
     dept: document.getElementById("deptUser").value,
     equip: document.getElementById("equipUser").value,
     serial: document.getElementById("serialUser").value,
     problem: document.getElementById("problemUser").value,
-    userSign: signature,
-    status: "open",
+    userSign: document.getElementById("userSignImg").src,
+    status:"open",
     created: firebase.firestore.FieldValue.serverTimestamp()
   };
   db.collection("complaints").add(data).then(()=>{
-    alert("Complaint Submitted!");
+    alert("Complaint submitted!");
     document.getElementById("deptUser").value="";
     document.getElementById("equipUser").value="";
     document.getElementById("serialUser").value="";
@@ -199,30 +174,40 @@ function submitComplaint(){
 
 // ENGINEER DASHBOARD
 function loadComplaints(){
-  db.collection("complaints").orderBy("created","desc").onSnapshot(snapshot=>{
+  db.collection("complaints").orderBy("created","desc").onSnapshot(snap=>{
     const tbody=document.querySelector("#complaintTable tbody");
     tbody.innerHTML="";
-    snapshot.forEach(doc=>{
+    snap.forEach(doc=>{
       const c=doc.data();
       const tr=document.createElement("tr");
-      tr.innerHTML = `
-        <td>${doc.id}</td><td>${c.dept}</td><td>${c.equip}</td>
-        <td>${c.problem}</td><td>${c.status}</td>
-        <td>${c.status==="open"?`<button onclick="closeComplaint('${doc.id}')">Close</button>`:"Closed"}</td>`;
+      tr.innerHTML=`<td>${doc.id}</td><td>${c.dept}</td><td>${c.equip}</td>
+      <td>${c.problem}</td><td>${c.status}</td>
+      <td>${c.status==="open"?`<button onclick="closeComplaint('${doc.id}')">Close</button>`:"Closed"}</td>`;
       tbody.appendChild(tr);
     });
   });
 }
 
-function closeComplaint(id){ signer=id; openSignature("engineer"); }
+function closeComplaint(id){
+  signer=id; openSignature("engineer");
+}
+
 function saveEngineerAction(signature){
   const action = prompt("Enter Action Taken:");
-  db.collection("complaints").doc(signer).update({
-    actionTaken: action,
-    engineerSign: signature,
-    status: "closed",
-    closed: firebase.firestore.FieldValue.serverTimestamp()
-  }).then(()=>alert("Complaint Closed!"));
+  if(!action){ alert("Action required"); return; }
+
+  db.collection("complaints").doc(signer).get().then(doc=>{
+    const data = doc.data();
+    db.collection("complaints").doc(signer).update({
+      actionTaken: action,
+      engineerSign: signature,
+      status:"closed",
+      closed: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(()=>{
+      alert("Complaint Closed!");
+      generatePDF(doc.id, data, action, signature);
+    });
+  });
 }
 
 // SIGNATURE
@@ -242,6 +227,40 @@ function acceptSignature(){
 }
 function clearSignature(){ sigPad.clear(); }
 function closeSignature(){ document.getElementById("sigModal").style.display="none"; }
+
+// PDF generation & Cloud storage
+async function generatePDF(id, complaintData, action, engineerSign){
+  const content=`<div>
+    <h3>Complaint ID: ${id}</h3>
+    <p><b>Dept:</b> ${complaintData.dept}</p>
+    <p><b>Equipment:</b> ${complaintData.equip}</p>
+    <p><b>Serial:</b> ${complaintData.serial}</p>
+    <p><b>Problem:</b> ${complaintData.problem}</p>
+    <p><b>User Signature:</b><br><img src="${complaintData.userSign}" width="180"></p>
+    <p><b>Action Taken:</b> ${action}</p>
+    <p><b>Engineer Signature:</b><br><img src="${engineerSign}" width="180"></p>
+  </div>`;
+
+  const div=document.createElement("div");
+  div.innerHTML=content; document.body.appendChild(div);
+  const canvas=await html2canvas(div,{scale:2});
+  const img=canvas.toDataURL("image/jpeg",0.98);
+  const pdf=new jspdf.jsPDF("p","mm","a4");
+  const pageWidth=pdf.internal.pageSize.getWidth();
+  const pageHeight=pdf.internal.pageSize.getHeight();
+  const imgProps=pdf.getImageProperties(img);
+  const pdfHeight=(imgProps.height*pageWidth)/imgProps.width;
+  const scaleFactor=pageHeight/pdfHeight;
+  pdf.addImage(img,"JPEG",0,0,pageWidth,pdfHeight*scaleFactor);
+  const fileName = `Complaint_${id}.pdf`;
+  pdf.save(fileName);
+
+  // Upload to Firebase Storage
+  const storageRef = storage.ref().child("complaints/"+fileName);
+  const blob = await (await fetch(img)).blob();
+  storageRef.put(blob).then(()=>console.log("Uploaded PDF to Cloud"));
+  document.body.removeChild(div);
+}
 </script>
 </body>
 </html>
